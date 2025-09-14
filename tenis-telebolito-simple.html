@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tenis Telebolito Simple</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            touch-action: none;
+        }
+        #debugInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="debugInfo"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const debugInfo = document.getElementById('debugInfo');
+
+        let paddleY = 0;
+
+        function log(message) {
+            console.log(message);
+            debugInfo.innerHTML += message + '<br>';
+        }
+
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            paddleY = canvas.height / 2;
+            log(`Canvas size: ${canvas.width}x${canvas.height}`);
+        }
+
+        function drawPaddle() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(canvas.width - 20, paddleY - 50, 10, 100);
+        }
+
+        function handleTouch(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            paddleY = touch.clientY;
+            log(`Touch at Y: ${paddleY}`);
+        }
+
+        function gameLoop() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawPaddle();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('load', () => {
+            log('Window loaded');
+            setCanvasSize();
+            window.addEventListener('resize', setCanvasSize);
+            canvas.addEventListener('touchmove', handleTouch, { passive: false });
+            gameLoop();
+        });
+
+        log('Script loaded');
+    </script>
+</body>
+</html>
