@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenis Telebolito CRT Mejorado</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #222;
+            overflow: hidden;
+        }
+        .tv-container {
+            position: relative;
+            width: 840px;
+            height: 640px;
+            background-color: #111;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .tv-screen {
+            width: 800px;
+            height: 600px;
+            background-color: #000;
+            border-radius: 100px / 20px;
+            overflow: hidden;
+            position: relative;
+        }
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            filter: brightness(1.2) contrast(1.4) blur(0.5px);
+        }
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+            animation: scanline 10s linear infinite;
+            opacity: 0.1;
+        }
+        @keyframes scanline {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(600px); }
+        }
+        .glare {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center,
+                rgba(255,255,255,0.2) 0%,
+                rgba(255,255,255,0) 60%);
+            pointer-events: none;
+        }
+        .bad-connection {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right,
+                rgba(255,255,255,0) 0%,
+                rgba(255,255,255,0.1) 50%,
+                rgba(255,255,255,0) 100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div class="tv-container">
+        <div class="tv-screen">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div class="scanline"></div>
+            <div class="glare"></div>
+            <div class="bad-connection"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const badConnection = document.querySelector('.bad-connection');
+
+        // Game objects
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 8,
+            dx: 6,
+            dy: 6
+        };
+
+        const paddle = {
+            width: 15,
+            height: 100,
+            y: canvas.height / 2 - 50,
+            speed: 8
+        };
+
+        const opponent = {
+            width: 15,
+            height: 100,
+            y: canvas.height / 2 - 50
+        };
+
+        let playerScore = 0;
+        let opponentScore = 0;
+        let keys = {};
+
+        // Event listeners for keyboard
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Event listener for mouse movement
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            paddle.y = (e.clientY - rect.top) * (canvas.height / rect.height) - paddle.height / 2;
+            clampPaddlePosition();
+        });
+
+        function clampPaddlePosition() {
+            if (paddle.y < 0) {
+                paddle.y = 0;
+            }
+            if (paddle.y + paddle.height > canvas.height) {
+                paddle.y = canvas.height - paddle.height;
+            }
+        }
+
+        function drawObject(x, y, width, height) {
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(x, y, width, height);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawScore() {
+            ctx.font = '48px "Courier New", Courier, monospace';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${playerScore}   ${opponentScore}`, canvas.width / 2, 60);
+        }
+
+        function drawCenterLine() {
+            ctx.setLineDash([20, 15]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function updateGame() {
+            // Move the paddle based on keyboard input
+            if (keys['ArrowUp']) {
+                paddle.y -= paddle.speed;
+            }
+            if (keys['ArrowDown']) {
+                paddle.y += paddle.speed;
+            }
+            clampPaddlePosition();
+
+            // Move the ball
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Ball collision with top and bottom walls
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.dy = -ball.dy;
+                simulateBadConnection();
+            }
+
+            // Ball collision with paddle
+            if (ball.x + ball.radius > canvas.width - paddle.width) {
+                if (ball.y > paddle.y && ball.y < paddle.y + paddle.height) {
+                    ball.dx = -ball.dx;
+                    const deltaY = ball.y - (paddle.y + paddle.height / 2);
+                    ball.dy = deltaY * 0.35;
+                    simulateBadConnection();
+                } else if (ball.x + ball.radius > canvas.width) {
+                    opponentScore++;
+                    resetBall();
+                }
+            }
+
+            // Ball collision with opponent
+            if (ball.x - ball.radius < opponent.width) {
+                if (ball.y > opponent.y && ball.y < opponent.y + opponent.height) {
+                    ball.dx = -ball.dx;
+                    simulateBadConnection();
+                } else if (ball.x - ball.radius < 0) {
+                    playerScore++;
+                    resetBall();
+                }
+            }
+
+            // Simple AI for opponent
+            const targetY = ball.y - (opponent.height / 2);
+            opponent.y += (targetY - opponent.y) * 0.1;
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.dx = -ball.dx;
+            ball.dy = Math.random() * 10 - 5;
+            simulateBadConnection();
+        }
+
+        function simulateBadConnection() {
+            badConnection.style.opacity = '1';
+            setTimeout(() => {
+                badConnection.style.opacity = '0';
+            }, 100);
+        }
+
+        function gameLoop() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawCenterLine();
+            drawObject(canvas.width - paddle.width, paddle.y, paddle.width, paddle.height);
+            drawObject(0, opponent.y, opponent.width, opponent.height);
+            drawBall();
+            drawScore();
+            updateGame();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
